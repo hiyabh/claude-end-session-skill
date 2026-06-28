@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>סקיל "סוף סשן" ל-Claude Code · בין קודש לקלוד</title>
+<style>
+  :root{ --bg:#0f1115; --card:#181b22; --ink:#f3f5f8; --muted:#9aa3b2; --gold:#ffd36e; --line:#262b34; --green:#7ee08a; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",Arial,Helvetica,sans-serif;line-height:1.6}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:30px;margin:0 0 6px}
+  h2{font-size:21px;margin:36px 0 12px;color:var(--gold)}
+  .sub{color:var(--muted);margin:0 0 24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:16px 0}
+  .btn{display:inline-block;background:var(--gold);color:#1a1206;font-weight:700;text-decoration:none;
+       padding:12px 22px;border-radius:10px;margin:6px 0}
+  .btn.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+  pre{background:#0b0d11;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;
+      white-space:pre-wrap;font-size:13.5px;direction:rtl;text-align:right}
+  code{font-family:Consolas,Menlo,monospace}
+  ul{margin:8px 0;padding-inline-start:22px}
+  li{margin:5px 0}
+  .tag{color:var(--muted);font-size:13px}
+  .grid b{color:var(--gold)}
+  .num{color:var(--green);font-weight:700}
+  a{color:var(--gold)}
+  .foot{margin-top:48px;border-top:1px solid var(--line);padding-top:20px;color:var(--muted)}
+  .copybtn{float:left;background:#222833;color:var(--ink);border:1px solid var(--line);border-radius:8px;
+           padding:6px 12px;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛟 סקיל "סוף סשן" ל-Claude Code</h1>
+  <p class="sub">כפתור גיבוי אחד שסוגר כל שיחת עבודה בלי לאבד שום דבר · קהילת <b>בין קודש לקלוד</b></p>
+
+  <div class="card">
+    <a class="btn" href="end-session-skill.tar.gz">⬇️ הורדת הסקיל (tar.gz)</a>
+    <a class="btn ghost" href="https://github.com/hiyabh/claude-end-session-skill">קוד המקור ב-GitHub</a>
+  </div>
+
+  <h2>מה זה עושה?</h2>
+  <div class="card">
+    <p>במקום לזכור בעצמך לתעד מה עשית, לעדכן יומן, ולשמור גיבוי — אתה כותב מילה אחת
+       (<b>"סיימנו"</b> או <b>/end-session</b>) ו-Claude סוגר את כל הסשן בשבילך:</p>
+    <ul>
+      <li><span class="num">1.</span> <b>בדיקת בטיחות</b> — מוודא שלא דרסת שינויים שנעשו במקביל בערוץ אחר</li>
+      <li><span class="num">2.</span> <b>תמצית מצב</b> — איפה עצרת ומה הצעד הבא (לפתיחה מהירה מחר)</li>
+      <li><span class="num">3.</span> <b>יומן מפורט</b> — מה נעשה, מה הוחלט ולמה, מה עוד פתוח</li>
+      <li><span class="num">4.</span> <b>יומן שינויים</b> — מה השתנה למשתמש, בעברית</li>
+      <li><span class="num">5.</span> <b>גרסה</b> — מעדכן מספר גרסה אם פרסת משהו</li>
+      <li><span class="num">6.</span> <b>רישום מרכזי</b> — שומר שורה ב"מאגר הפרויקטים" ומוודא שהגיבוי עלה</li>
+      <li><span class="num">7.</span> <b>זיכרון</b> — אם למד ממך משהו חדש, שומר אותו לפעם הבאה</li>
+    </ul>
+    <p class="tag">כל שלב שלא רלוונטי לסשן הנוכחי — מדולג אוטומטית. אין צורך להגדיר כלום.</p>
+  </div>
+
+  <h2>התקנה בלחיצת הדבקה</h2>
+  <p>פותחים את Claude Code, מדביקים את הבלוק הבא, והוא מתקין הכול לבד:</p>
+  <div class="card">
+    <button class="copybtn" onclick="copyPrompt()">העתק</button>
+<pre id="prompt">הי קלוד! התקן לי בבקשה את סקיל "סוף סשן" (end-session).
+1. זהה את מערכת ההפעלה שלי ואת הנתיב ~/.claude/skills/ (ב-Windows: C:\Users\&lt;user&gt;\.claude\skills\). צור את התיקייה אם אינה קיימת.
+2. הורד את החבילה: https://hiyabh.github.io/claude-end-session-skill/end-session-skill.tar.gz
+3. חלץ ממנה את התיקייה end-session אל ~/.claude/skills/ — אל תדרוס סקיל קיים בלי לשאול אותי.
+4. אמת שהסקיל הותקן (קובץ ~/.claude/skills/end-session/SKILL.md קיים) ותן לי לסיכום מה הוא עושה.
+5. הסבר לי איך להפעיל אותו — שאני פשוט כותב "סיימנו" או /end-session בסוף יום עבודה.</pre>
+  </div>
+
+  <h2>איך משתמשים</h2>
+  <div class="card">
+    <p>בסוף כל שיחת עבודה, פשוט כותבים אחת מהמילים:</p>
+    <ul>
+      <li><b>סיימנו</b> · <b>סוף סשן</b> · <b>תסגור סשן</b> · <b>נגמר הסשן</b></li>
+      <li>או הפקודה <b>/end-session</b></li>
+    </ul>
+    <p class="tag">הסקיל רץ רק כשאתה אומר לו — לעולם לא קוטע אותך באמצע עבודה.</p>
+  </div>
+
+  <div class="foot">
+    👈 בין קודש לקלוד · <a href="https://chat.whatsapp.com/Hr8UI2Oy6lkJTPY3tizdSd?s=cl&p=a&mlu=1">הצטרפות לקבוצה</a>
+  </div>
+</div>
+
+<script>
+function copyPrompt(){
+  var t = document.getElementById('prompt').innerText;
+  navigator.clipboard.writeText(t).then(function(){
+    var b=document.querySelector('.copybtn'); b.textContent='הועתק ✓';
+    setTimeout(function(){b.textContent='העתק';},1600);
+  });
+}
+</script>
+</body>
+</html>
