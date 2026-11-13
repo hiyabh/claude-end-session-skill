@@ -69,6 +69,10 @@ created this session (test renders, scratch scripts, debug output) that are not 
   `README*`, `CLAUDE.md`, `CHANGELOG.md`.
 - A file with a live `~$` lock beside it (the user has it open).
 
+On Windows `nul` (like `con`, `prn`, `aux`) is a reserved device name that plain `rm` /
+`os.remove` miss: delete it with the `\\?\` prefix, building the backslashes with `chr(92)` to
+dodge shell escaping - `python -c "import os;B=chr(92);os.remove(B+B+'?'+B+r'<abs path>')"`.
+
 Move, never overwrite (add ` (2)` on a name clash). On Windows keep every path under 260
 characters - count characters, not bytes (a Hebrew letter is 2 bytes in UTF-8). Keep a
 "moved → to" list for the journal and the summary. A second run must change nothing.
