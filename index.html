@@ -4,6 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>סקיל "סוף סשן" ל-Claude Code · בין קודש לקלוד</title>
+<meta name="description" content="כותבים &quot;סיימנו&quot;, וקלוד מסדר את התיקייה, מתעד את מה שנעשה ומגבה הכול לגיטהאב. התקנה בהדבקה אחת.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="בין קודש לקלוד">
+<meta property="og:locale" content="he_IL">
+<meta property="og:title" content="סוף סשן - סקיל שסוגר כל יום עבודה עם Claude Code">
+<meta property="og:description" content="כותבים &quot;סיימנו&quot;, וקלוד מסדר את התיקייה, מתעד את מה שנעשה ומגבה הכול לגיטהאב. התקנה בהדבקה אחת.">
+<meta property="og:url" content="https://hiyabh.github.io/claude-end-session-skill/">
+<meta property="og:image" content="https://hiyabh.github.io/claude-end-session-skill/og-end-session-v2.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   :root{ --bg:#0f1115; --card:#181b22; --ink:#f3f5f8; --muted:#9aa3b2; --gold:#ffd36e; --line:#262b34; --green:#7ee08a; }
   *{box-sizing:border-box}
@@ -47,15 +58,20 @@
        (<b>"סיימנו"</b> או <b>/end-session</b>) ו-Claude סוגר את כל הסשן בשבילך:</p>
     <ul>
       <li><span class="num">1.</span> <b>בדיקת בטיחות</b> - מוודא שלא דרסת שינויים שנעשו במקביל בערוץ אחר, ושואל אותך לפני שמאחדים היסטוריה שהתפצלה</li>
-      <li><span class="num">2.</span> <b>תמצית מצב</b> - איפה עצרת ומה הצעד הבא (לפתיחה מהירה מחר)</li>
-      <li><span class="num">3.</span> <b>יומן מפורט</b> - מה נעשה, מה הוחלט ולמה, ומה עוד פתוח (שום משימה מתוכננת לא נשכחת)</li>
-      <li><span class="num">4.</span> <b>יומן שינויים</b> - מה השתנה למשתמש, בשפה של הפרויקט</li>
-      <li><span class="num">5.</span> <b>גרסה</b> - מעדכן מספר גרסה אם פרסת משהו</li>
-      <li><span class="num">6.</span> <b>גיבוי לפרויקט</b> - שומר ודוחף לגיטהאב ומוודא שהכול באמת עלה. אם אין עדיין ריפו, יוצר ריפו פרטי, אחרי סריקה שמוודאת שלא נדחפות סיסמאות או מידע אישי</li>
-      <li><span class="num">7.</span> <b>רישום מרכזי</b> (לא חובה) - אם יש לך קובץ מעקב אחרי כל הפרויקטים, מוסיף אליו שורה</li>
-      <li><span class="num">8.</span> <b>זיכרון</b> - אם למד ממך משהו חדש, שומר אותו לפעם הבאה</li>
+      <li><span class="num">2.</span> <b>סידור התיקייה</b> - מוחק זבל טכני, מעביר קבצים מפוזרים לתיקייה הנכונה ונותן להם שם ברור. קובץ שלא ברור לאן הוא שייך עובר לתיקיית _לבדיקה, ושום דבר אחר לא נמחק</li>
+      <li><span class="num">3.</span> <b>תמצית מצב</b> - איפה עצרת ומה הצעד הבא, קצרה בכוונה כדי שתיטען מהר מחר</li>
+      <li><span class="num">4.</span> <b>יומן מפורט</b> - מה נעשה, מה הוחלט ולמה, ומה עוד פתוח (שום משימה מתוכננת לא נשכחת)</li>
+      <li><span class="num">5.</span> <b>קובצי ידע</b> - אם יש לך קובץ עובדות על העסק או על המשפחה, עובר על השיחה ומעדכן אותו בכל עובדה חדשה, עם מקור ותאריך. סתירה לערך קיים לא מוכרעת לבד אלא מוצגת לך כשאלה</li>
+      <li><span class="num">6.</span> <b>יומן שינויים</b> - מה השתנה למשתמש, בשפה של הפרויקט</li>
+      <li><span class="num">7.</span> <b>גרסה</b> - מעדכן מספר גרסה אם פרסת משהו</li>
+      <li><span class="num">8.</span> <b>גיבוי לפרויקט</b> - שומר ודוחף לגיטהאב ומוודא שהכול באמת עלה. אם אין עדיין ריפו, יוצר ריפו פרטי, אחרי סריקה שמוודאת שלא נדחפות סיסמאות או מידע אישי</li>
+      <li><span class="num">9.</span> <b>רישום מרכזי</b> - (לא חובה) אם יש לך קובץ מעקב אחרי כל הפרויקטים, מוסיף אליו שורה</li>
+      <li><span class="num">10.</span> <b>ריפו ההגדרות</b> - (לא חובה) אם תיקיית ההגדרות של קלוד שמורה בגיטהאב, מוודא שגם השינויים בה נדחפו</li>
+      <li><span class="num">11.</span> <b>זיכרון</b> - אם למד ממך משהו חדש, שומר אותו לפעם הבאה</li>
+      <li><span class="num">12.</span> <b>בדיקות אחרונות</b> - עוצר תהליכים שנשארו פתוחים ברקע, ובפריסה ראשונה בודק שהקישור עובד ונראה טוב כשמשתפים אותו</li>
     </ul>
     <p class="tag">כל שלב שלא רלוונטי לסשן הנוכחי — מדולג אוטומטית. אין צורך להגדיר כלום.</p>
+    <p class="tag">עודכן 13.11.2026: נוספו סידור התיקייה, עדכון קובצי ידע ובדיקות אחרונות. כבר התקנת? הדבק שוב את בלוק ההתקנה והסקיל יתעדכן.</p>
   </div>
 
   <h2>התקנה בלחיצת הדבקה</h2>
@@ -65,7 +81,7 @@
 <pre id="prompt">הי קלוד! התקן לי בבקשה את סקיל "סוף סשן" (end-session).
 1. זהה את מערכת ההפעלה שלי ואת הנתיב ~/.claude/skills/ (ב-Windows: C:\Users\&lt;user&gt;\.claude\skills\). צור את התיקייה אם אינה קיימת.
 2. הורד את החבילה: https://hiyabh.github.io/claude-end-session-skill/end-session-skill.tar.gz
-3. חלץ ממנה את התיקייה end-session אל ~/.claude/skills/ — אל תדרוס סקיל קיים בלי לשאול אותי.
+3. חלץ ממנה את התיקייה end-session אל ~/.claude/skills/. אם הסקיל כבר מותקן, העבר את הגרסה הקיימת לגיבוי ב-~/.claude/skill-backups/ (לא בתוך skills, כדי שלא תיטען פעמיים) והחלף אותה בחדשה.
 4. אמת שהסקיל הותקן (קובץ ~/.claude/skills/end-session/SKILL.md קיים) ותן לי לסיכום מה הוא עושה.
 5. הסבר לי איך להפעיל אותו — שאני פשוט כותב "סיימנו" או /end-session בסוף יום עבודה.</pre>
   </div>

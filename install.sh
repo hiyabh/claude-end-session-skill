@@ -28,11 +28,14 @@ SRC="$TMP/x/skills"
 
 dest="$SKILLS_DIR/end-session"
 if [ -e "$dest" ]; then
-  echo "   skip (already exists): end-session — remove it first to reinstall."
-else
-  cp -r "$SRC/end-session" "$dest"
-  echo "   installed: end-session"
+  # Back up OUTSIDE skills/ - a copy inside it would load as a duplicate skill.
+  backup="${HOME}/.claude/skill-backups/end-session-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$(dirname "$backup")"
+  mv "$dest" "$backup"
+  echo "   existing version backed up to: $backup"
 fi
+cp -r "$SRC/end-session" "$dest"
+echo "   installed: end-session"
 
 echo ""
 echo "==> Done. Restart Claude Code so it picks up the new skill."

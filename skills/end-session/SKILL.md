@@ -1,193 +1,213 @@
 ---
-description: "End-of-session close-out routine. The agreed command to wrap up a work session correctly and losslessly. TRIGGER when the user types /end-session, or says 'סוף סשן', 'סיימנו', 'תסגור סשן', 'נגמר הסשן', 'סוגרים', 'end session', 'wrap up', 'close out the session'. Runs the full ordered close-out: external-changes safety check, primer, journal, changelog, version bump, project commit+push (verified; creates a private GitHub remote if missing, after a secrets scan), optional projects-registry row, behavioral memory. Skip individual steps per the per-step skip rules. NEVER trigger mid-task - only when the user signals the session is done."
+description: "End-of-session close-out routine - the agreed command to wrap up a work session losslessly: tidies the working folder, updates the state snapshot, journal and your knowledge files, changelog and version, then commits and pushes the project (verified; creates a private GitHub remote after a secrets scan). TRIGGER when the user types /end-session, or says 'סוף סשן', 'סיימנו', 'תסגור סשן', 'נגמר הסשן', 'סוגרים', 'end session', 'wrap up', 'close out the session'. NEVER trigger mid-task - only when the user signals the session is done."
 ---
 
 # End Session - Agreed Close-Out Command
 
-## Purpose
-One agreed command (`/end-session`) that runs the complete, ordered end-of-session
-routine so **zero context is lost** and every persistent store stays in sync:
-state snapshot, journal, changelog, version, git remote, and memory.
+One agreed command (`/end-session`) that runs the complete, ordered end-of-session routine so
+**zero context is lost** and every persistent store stays in sync: a tidy folder, a state
+snapshot, a journal, knowledge files, changelog, version, git remote and memory.
 
-**Trigger model:** user-invoked only. The user types the command (or an equivalent
-phrase) when *they* decide the session is over. This is NOT a hook and must NOT
-fire automatically mid-task.
+**Trigger model:** user-invoked only - when *the user* decides the session is over. Not a hook,
+never mid-task.
 
-**Language:** talk to the user in their own language (the summary template at the
-bottom is in Hebrew - translate it if the user works in another language). Code and
-commit messages in English.
+**Language:** talk to the user in their own language (the summary template at the bottom is in
+Hebrew - translate it if the user works in another language). Code and commit messages in English.
+
+**How to run it:** step by step, in this order. After each step note one line - done, or skipped
+and why. Skipping a step that does not apply is expected. End with the summary at the bottom.
 
 ---
 
-## Pre-flight (run first, before any write)
+## Pre-flight
 
-**P0. Confirm scope.** If the session was read-only / research-only with **zero file
-changes and zero project work**, do NOT run the full routine. Say so and stop.
-(A pure-question session needs no journal, changelog or push.)
+**P0. Scope.** A read-only / research session with zero file changes gets no close-out - say so
+and stop. Exception: step 5 (knowledge files) still runs if the user stated a new fact worth keeping.
 
-**P1. Determine the active project.** Identify which folder this session actually
-worked on. A scratch / experiments workspace that is not a git repo normally skips the
-changelog, version bump and project push steps.
+**P1. Active project.** Identify the folder this session actually worked on, plus any output
+folders it created elsewhere. A scratch workspace that is not a git repo skips the changelog,
+version and project-push steps, but still gets the folder tidy and the journal.
 
 ---
 
 ## Ordered routine
 
-> Run the steps **in this order**. After each step, note one line of what was done
-> (or why it was skipped). At the end, present the summary in the format at the bottom.
+### 1. External-changes safety check
+*Goal: never overwrite work done in parallel through another channel (a bot, another editor or
+agent, a teammate, manual edits).*
 
-### Step 1 - External-changes safety check
-*Goal: never overwrite work done in parallel through another channel (a bot, another
-editor or agent, a teammate, manual edits) before the final commit.*
+Only if the project is a git repo with an upstream: `git fetch` (~8s timeout), `git status`,
+`git rev-list --count HEAD..@{u}` (if > 0, show `git log --oneline HEAD..@{u}`).
+- Clean local + remote ahead: propose `git pull --ff-only`.
+- Diverged: show both sides and **ask the user** (merge / rebase / cherry-pick). Never merge
+  diverged history silently.
 
-Only if the active project is a git repo with an upstream:
-1. `git fetch` (give it a short timeout, ~8s).
-2. `git status` - surface any uncommitted local changes.
-3. `git rev-list --count HEAD..@{u}` - if > 0, run `git log --oneline HEAD..@{u}`
-   and show the user what changed.
-4. Resolve before committing:
-   - clean local + remote ahead: propose a fast-forward `git pull --ff-only`.
-   - diverged (both sides have new commits): show both sides and **ask the user**
-     how to proceed (merge / rebase / cherry-pick). Never merge diverged history silently.
-5. Only continue once the tree is in a known-good state.
+Continue only from a known-good tree. Not a git repo / no upstream: skip silently.
 
-Not a git repo, or no upstream: skip silently.
+### 2. Folder tidy (automatic)
+*Goal: the folder looks finished, not like a workbench.* Scope: the project folder and output
+folders created this session.
 
-### Step 2 - Primer (short state snapshot)
-File: `<project>/docs/memory/primer.md` (create it if the project keeps none).
+**Delete - known technical junk only:** `nul` (a Windows `> NUL` accident), `__pycache__/`,
+`*.pyc`, `*.tmp`, `Thumbs.db`, orphaned `~$*` Office lock files, and intermediate files *you*
+created this session (test renders, scratch scripts, debug output) that are not deliverables.
 
-A **concise snapshot**, not a copy of the journal:
-- **Last updated:** date + one-line headline.
-- **Current focus** (1-2 lines).
-- **This session:** 3-6 bullets - done / state / next / blockers.
-- **Link** to the journal entry from Step 3 instead of repeating its detail.
+**Move and rename:**
+- Loose files in the root (video, images, zip, PDF, DOCX, exports) go into the folder of the task
+  that produced them, or a type folder (`video/`, `images/`, `docs/`, `archives/` - in the user's
+  language if the project is in Hebrew).
+- Deliverables get a descriptive name that matches their title.
+- Unclear where a file belongs: move it to `_לבדיקה/` (`_to-review/`) in the root. Never delete it.
 
-### Step 3 - Session journal (full detail)
-File: `docs/journal/YYYY-MM-DD.md` in the project (or your existing journal location;
-append if today's entry already exists).
+**Never touch:**
+- A file referenced by code, config or docs. Grep the full file name first; if it is referenced,
+  leave it - unless you moved it this session, then update the reference. (A generic name such
+  as `nul` matches `>nul` in scripts; that is not a real reference.)
+- Tracked source layout, `.git`, `node_modules`, `.env*`, the memory/journal folders, and raw
+  archives kept verbatim on purpose.
+- Tool-owned root files: `package.json`, `*-lock.json` / `*.lock`, `.gitignore`, `*.config.*`,
+  `README*`, `CLAUDE.md`, `CHANGELOG.md`.
+- A file with a live `~$` lock beside it (the user has it open).
 
-Sections: Completed, Current State, **Next Steps (priority order)**, Open Issues,
-Key Decisions (with the WHY), Files Changed, Notes.
+Move, never overwrite (add ` (2)` on a name clash). On Windows keep every path under 260
+characters - count characters, not bytes (a Hebrew letter is 2 bytes in UTF-8). Keep a
+"moved → to" list for the journal and the summary. A second run must change nothing.
 
-**Pending-tasks sweep:** before writing Next Steps, scan the whole session for
-*anything the user mentioned or that was planned but not finished*, and make sure each
-item appears there. This section is tomorrow's todo list - nothing planned may
-silently drop.
+### 3. Primer (short state snapshot)
+File: `<project>/docs/memory/primer.md` (create it if the project keeps none). If it is loaded
+into every new session, its size costs context every time - keep it small.
+- **Last updated:** date + one-line headline. **Current focus:** 1-2 lines.
+- **This session:** 3-6 bullets (done / state / next / blockers) + a link to the journal entry.
+- **Enforce the size:** keep only the **5 most recent** session entries - older ones already live
+  in the journal, delete them. If a hook appends auto-generated blocks (git snapshots and the
+  like), keep only the newest one.
 
-### Step 4 - CHANGELOG (user-visible changes)
-File: `<project>/CHANGELOG.md`, under `[Unreleased]`, grouped as Added / Changed /
-Fixed / Removed / Security / Performance (Keep a Changelog style), in the project's
-language. One line per change.
+### 4. Session journal (full detail)
+File: `docs/journal/YYYY-MM-DD.md` in the project (or your existing journal location; append if
+today's entry exists).
 
-Skip rules:
-- Docs-only commits, internal refactors with no user-visible change, and dependency
-  bumps with no behavior change: skip.
-- Experiment / scratch workspaces: skip without deliberation.
-- The project should have a changelog but none exists: bootstrap one from `git log`.
+Sections: Completed, Current State, **Next Steps (priority order)**, Open Issues, Key Decisions
+(with the WHY), Files Changed, Folder tidy (moved → to), Notes.
 
-### Step 5 - Version bump (SemVer)
-File: `package.json` (or the ecosystem's equivalent) - **only if the project was
-deployed or released this session**.
-- PATCH = fixes / copy / small UI; MINOR = features, fields, pages; MAJOR = breaking.
-- Several changes in one release: the highest level wins.
-- Move the `[Unreleased]` changelog entries under the new version heading.
-- Commit message includes it: `chore: bump version to X.Y.Z`.
-- Not deployed: skip.
+**Pending-tasks sweep:** before writing Next Steps, scan the whole session for anything the user
+mentioned or that was planned but not finished. Each item lands in Next Steps - nothing planned
+may silently drop.
 
-### Step 6 - Project commit + push (VERIFIED)
-The active project's own repo. Skip only if it is not a git repo, or if
-`git status --porcelain` is empty **and** there is nothing unpushed.
+### 5. Knowledge files (OPTIONAL)
+Only if the user keeps knowledge files - for example a company facts file (projects, numbers,
+statuses, team) or a personal details file (family, contacts, institutions). Find them in the
+user's `CLAUDE.md` or memory. Otherwise skip.
 
-*Why this exists:* a commit that never leaves the machine is not a backup, and a
-project with no remote exists in exactly one physical place.
+Sweep the whole session (the user's messages, documents read, decisions) for **new facts** that
+belong in one of them:
+- Update the right section, tag the source and the date (`[user, 2026-11-13]`,
+  `[document X]`), and add a row to the file's change log if it keeps one.
+- **A contradiction with an existing value is never decided silently** - record it as an open
+  question and show it to the user.
+- **Privacy:** the values never go into the journal, primer, changelog, a commit message or any
+  file that is pushed. The summary names only the section that changed.
 
-1. **Ensure a remote exists.** `git remote get-url origin` - if missing, offer to create
-   a **private** GitHub repo (requires the `gh` CLI, logged in):
+Nothing new: one line, "no new fact".
+
+### 6. CHANGELOG (user-visible changes)
+`<project>/CHANGELOG.md`, under `[Unreleased]`, grouped as Added / Changed / Fixed / Removed /
+Security / Performance (Keep a Changelog style), in the project's language, one line per change.
+Skip for docs-only commits, internal refactors with no user-visible change, dependency bumps and
+scratch workspaces. The project should have one but none exists: bootstrap it from `git log`.
+
+### 7. Version bump (SemVer)
+`package.json` (or the ecosystem's equivalent) - **only if deployed or released this session**.
+PATCH = fixes / copy / small UI; MINOR = features; MAJOR = breaking; the highest level wins.
+Move the `[Unreleased]` entries under the new version heading; commit
+`chore: bump version to X.Y.Z`. Not deployed: skip.
+
+### 8. Project commit + push (VERIFIED)
+Skip only if not a git repo, or the tree is clean **and** nothing is unpushed. A commit that never
+leaves the machine is not a backup.
+
+1. **Ensure a remote exists.** No `origin`: offer to create a **private** GitHub repo (needs the
+   `gh` CLI, logged in):
    ```bash
    gh repo create <owner>/<name> --private --source=. --push --description "<short description>"
    ```
-   **Mandatory scan BEFORE the first push** - a push publishes the *entire history*,
-   and a `.gitignore` added later does not clean old commits:
-   - File names across all history:
-     `git log --all --pretty=format: --name-only | sort -u` against `.env`,
-     `credentials.json`, `token.json`, `*.pem`, `*.key`, `*.db`, `*.sqlite`.
-   - Contents across all history:
-     `git grep -I -E '<secret patterns>' $(git rev-list --all)` - e.g. `sk-`,
-     `ghp_`, `AKIA`, `AIza`, bot-token shapes like `\d{8,10}:AA`,
-     `BEGIN .* PRIVATE KEY`.
-   - Personal data by content, not just by path (medical, financial, private names):
-     it leaks into changelogs and docs even when the data file is ignored.
-   - **A finding = stop.** Show the user what was found and where, and let them decide
-     (clean history / stay local / push knowingly). A private repo is not encryption.
-2. **Commit whatever remains**, split into atomic conventional commits
-   (`feat:`, `fix:`, `docs:`, `chore:`) - never one `wip`. The files written in
-   Steps 2-5 (primer, journal if in the repo, changelog, version) belong here.
-3. **Push, then verify** - never report success on the push command's exit code alone:
+   **Mandatory scan BEFORE the first push** - a push publishes the *entire history*, and a
+   `.gitignore` added later does not clean old commits:
+   - File names across all history: `git log --all --pretty=format: --name-only | sort -u`
+     against `.env`, `credentials.json`, `token.json`, `*.pem`, `*.key`, `*.db`, `*.sqlite`.
+   - Contents across all history: `git grep -I -E '<secret patterns>' $(git rev-list --all)` -
+     e.g. `sk-`, `ghp_`, `AKIA`, `AIza`, bot tokens like `\d{8,10}:AA`, `BEGIN .* PRIVATE KEY`.
+   - Personal data by content, not only by path (medical, financial, private names).
+   - **A finding = stop.** Show what was found and where; the user decides. A private repo is
+     not encryption.
+2. **Commit whatever remains** (including steps 2-7) as atomic conventional commits - never one
+   `wip`.
+3. **Push, then verify** - never report success on the exit code alone:
    ```bash
    git push
    git rev-list --count @{u}..HEAD     # must print 0
    test -z "$(git status --porcelain)" # tree must be clean
    ```
-   If the push failed (auth, conflict, rejected), surface the exact error. Do **not**
-   report success.
-4. If the project auto-deploys or is deployed manually and this session changed
-   runtime code, say plainly whether the deploy ran. A pushed commit is not a
-   deployed one.
+   A failed push: surface the exact error, do not report success.
+4. Changed runtime code in a deployed project: say plainly whether the deploy ran. A pushed
+   commit is not a deployed one.
 
-### Step 7 - Projects registry (OPTIONAL)
-Only if the user keeps a central projects registry / work log file (for example a
-`PROJECTS.md` in its own repo). Otherwise skip.
-1. Open the registry and find **this project's section** - edit only inside it,
-   never with a whole-file regex (a global replace can silently change another
-   project's entry). Match the file's existing line endings (CRLF vs LF).
-2. Append one work-log row (date + one-line summary); bump that section's
-   "last updated" date and, if present, the file-level one.
-3. Commit, push, and verify exactly as in Step 6.3 (do not assume the branch is
-   `main` - use `@{u}`).
-4. A second run on the same session must not add a duplicate row.
+### 9. Projects registry (OPTIONAL)
+Only if the user keeps a central projects registry (for example a `PROJECTS.md` in its own repo).
+Edit **only this project's section** - never a whole-file regex, which can silently change another
+project's entry. Keep the file's line endings (CRLF vs LF). Append one work-log row, bump the
+section's "last updated" (and the file-level one), then commit, push and verify as in 8.3. A second
+run must not add a duplicate row.
 
-### Step 8 - Behavioral memory
-Only if this session produced a **correction or a confirmed reusable pattern** (a
-preference the user stated, a mistake to avoid, a workflow that worked):
-- Add or update a memory file in Claude Code's memory directory for the project (one
-  fact per file) and a one-line pointer in its `MEMORY.md` index.
-- Check for an existing file that already covers it - update rather than duplicate.
-- Nothing new behaviorally: skip.
+### 10. Claude config repo (OPTIONAL)
+Only if `~/.claude` is itself a git repo and this session changed something in it (skills, hooks,
+`CLAUDE.md`, settings). Check `git -C ~/.claude status --porcelain` and
+`git -C ~/.claude rev-list --count @{u}..HEAD`; commit only the files this session touched,
+push, verify both are empty. Make sure no personal file (details, credentials) appears in
+`git status` - it must be gitignored.
+
+### 11. Behavioral memory
+Only for a **correction or a confirmed reusable pattern** (a stated preference, a mistake to
+avoid, a workflow that worked): one fact per file in Claude Code's memory directory for the
+project, plus a one-line pointer in its `MEMORY.md`. Update an existing file rather than duplicate.
+
+### 12. Last checks (one line each)
+- **Background processes** started this session (dev server, watcher, background shells): stop
+  the ones no longer needed; name any left running on purpose.
+- **A first production deploy** this session: the public link works and has a proper share
+  preview (`og:title`, `og:description`, a 1200x630 `og:image`).
 
 ---
 
 ## Final delivery
 
-Present a compact checklist of what ran vs. was skipped, then a 1-2 sentence summary:
-
 ```
 ✅ סוף סשן - <project>
 
-1. בדיקה חיצונית ........ <בוצע / N/A - לא git repo>
-2. Primer ............... <עודכן / N/A>
-3. יומן ................. <נכתב: <שם הקובץ>>
-4. CHANGELOG ............ <עודכן / דולג - <סיבה>>
-5. גרסה ................. <X.Y.Z / לא נפרס>
-6. Push לפרויקט ......... <commit+push אומת ✓ / N/A - לא git repo / נכשל - <שגיאה>>
-7. רישום מרכזי .......... <עודכן ואומת ✓ / דולג - אין רישום>
-8. זיכרון ............... <נשמר: <slug> / אין חדש>
+1. בדיקת שינויים חיצוניים .. <בוצע / N/A - לא git repo>
+2. סידור תיקייה ........... <נמחקו N, הועברו M, ל-_לבדיקה K / לא נדרש>
+3. Primer ................. <עודכן / N/A>
+4. יומן .................. <נכתב: <נתיב מלא>>
+5. קובצי ידע ............. <עודכן סעיף X / אין עובדה חדשה / אין קובצי ידע>
+6. CHANGELOG .............. <עודכן / דולג - <סיבה>>
+7. גרסה .................. <X.Y.Z / לא נפרס>
+8. Push לפרויקט ........... <אומת ✓ / N/A - לא git repo / נכשל - <שגיאה>>
+9. רישום מרכזי ............ <אומת ✓ / דולג - אין רישום>
+10. ריפו ההגדרות .......... <אומת ✓ / לא נגענו / אין>
+11. זיכרון ................ <נשמר: <slug> / אין חדש>
+12. בדיקות אחרונות ........ <תהליכי רקע / קישור / לא רלוונטי>
 
 סיכום: <משפט-שניים>
 פתוחים למחר: <הפריט הכי קריטי מ-Next Steps>
 ```
+Every file the user should open is written with its full absolute path. A contradiction found in
+step 5 appears here as an explicit question.
 
 ---
 
 ## Rules
-- **User-invoked only** - never run as part of mid-task work.
-- **Order matters** - the safety check (Step 1) is always first; the project push
-  (Step 6) comes after every project file is written; an optional registry push
-  (Step 7) comes last among writes so it captures everything.
-- **No session ends with unpushed project work** - local-only commits are not a backup.
-- **Never report a push as successful without verifying it** (`@{u}..HEAD` is 0 and
-  the tree is clean).
+- **Order:** the safety check is first; the folder tidy comes before any doc is written, so the
+  docs describe the final layout; pushes come after every file is written.
+- **No session ends with unpushed work** - and a push is reported only after its verification.
 - **Never push past a secrets/PII finding** - stop and ask.
-- **Per-step skip is allowed and expected** - note the reason; don't force a step
-  that doesn't apply.
-- **Never drop a planned/pending task** - it must land in Next Steps (Step 3).
-- **No changelog/version churn** for experiments, docs-only, or no-UX-change work.
+- **The tidy deletes only known junk.** Everything else is moved; anything unclear goes to
+  `_לבדיקה/`.
