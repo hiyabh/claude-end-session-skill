@@ -1,5 +1,5 @@
 ---
-description: "End-of-session close-out routine - the agreed command to wrap up a work session losslessly: tidies the working folder, updates the state snapshot, journal and your knowledge files, changelog and version, then commits and pushes the project (verified; creates a private GitHub remote after a secrets scan). TRIGGER when the user types /end-session, or says 'סוף סשן', 'סיימנו', 'תסגור סשן', 'נגמר הסשן', 'סוגרים', 'end session', 'wrap up', 'close out the session'. NEVER trigger mid-task - only when the user signals the session is done."
+description: "End-of-session close-out routine - the agreed command to wrap up a work session losslessly: tidies the working folder, updates the state snapshot, journal and your knowledge files, changelog and version, then commits and pushes the project (verified; creates a private GitHub remote after a secrets scan), and makes sure no agent or process it started is left running. TRIGGER when the user types /end-session, or says 'סוף סשן', 'סיימנו', 'תסגור סשן', 'נגמר הסשן', 'סוגרים', 'end session', 'wrap up', 'close out the session'. NEVER trigger mid-task - only when the user signals the session is done."
 ---
 
 # End Session - Agreed Close-Out Command
@@ -174,9 +174,41 @@ Only for a **correction or a confirmed reusable pattern** (a stated preference, 
 avoid, a workflow that worked): one fact per file in Claude Code's memory directory for the
 project, plus a one-line pointer in its `MEMORY.md`. Update an existing file rather than duplicate.
 
-### 12. Last checks (one line each)
-- **Background processes** started this session (dev server, watcher, background shells): stop
-  the ones no longer needed; name any left running on purpose.
+### 12. Leftover agents and processes
+*Goal: nothing this session started keeps running on the user's computer after it ends.* Runs on
+every close-out.
+
+**a. Agents inside the session (Claude's own tools):**
+- `ListAgents`: any subagent or fork this session spawned that still runs. If it's not needed, `TaskStop`.
+- Background tasks: Bash with `run_in_background`, `Monitor`, `Workflow`. Anything still active gets `TaskStop`.
+- `CronList`: a cron this session created only for itself gets `CronDelete`. A standing cron the user
+  asked for stays, and is named in the summary.
+- An active `/loop`: `ScheduleWakeup` with `stop: true`.
+- Never touch what isn't this session's: other Claude sessions, the OS's scheduled tasks, hooks.
+
+**b. Processes on the computer.** Killing a shell doesn't always kill what it started: on Windows,
+grandchildren survive their parent. On macOS/Linux they are re-parented to `init`/`launchd`. So a dev
+server, `ffmpeg`, a headless browser or a background `python` can outlive the session. Run the
+bundled script (`python3` on macOS/Linux, `python` on Windows):
+```bash
+python3 ~/.claude/skills/end-session/scripts/leftover_procs.py
+```
+It finds this session's Claude process (via `~/.claude/sessions/<pid>.json`, or the nearest
+`claude` ancestor). Then it lists that process's live descendants, plus orphans of known types
+(node, python, ffmpeg, shells, headless Chromium) started after the session began.
+- `mcp_servers` end with the session. They're info only.
+- Each item in `leftovers` has `pid`, `minutes`, `cmd` and `inner`, which is what runs under the
+  wrapper shell.
+
+To stop what isn't needed:
+`python3 ~/.claude/skills/end-session/scripts/leftover_procs.py --kill <pid> [<pid>...]`. It kills
+the whole tree and refuses any PID that isn't a leftover of this session. Then it re-scans. Exit 0
+means clean.
+- Something kept on purpose (a server the user is using) is named in the summary with its PID.
+- Other Claude sessions' processes are excluded by the script. Never kill them by hand.
+- No Python available: skip part b and say so in the summary.
+
+### 13. Last checks (one line each)
 - **A first production deploy** this session: the public link works and has a proper share
   preview (`og:title`, `og:description`, a 1200x630 `og:image`).
 
@@ -198,7 +230,8 @@ project, plus a one-line pointer in its `MEMORY.md`. Update an existing file rat
 9. רישום מרכזי ............ <אומת ✓ / דולג - אין רישום>
 10. ריפו ההגדרות .......... <אומת ✓ / לא נגענו / אין>
 11. זיכרון ................ <נשמר: <slug> / אין חדש>
-12. בדיקות אחרונות ........ <תהליכי רקע / קישור / לא רלוונטי>
+12. סוכנים ותהליכים ....... <נקי ✓ / נעצרו N / נשאר בכוונה: <שם> (PID)>
+13. בדיקות אחרונות ........ <קישור / לא רלוונטי>
 
 סיכום: <משפט-שניים>
 פתוחים למחר: <הפריט הכי קריטי מ-Next Steps>
@@ -213,5 +246,7 @@ step 5 appears here as an explicit question.
   docs describe the final layout; pushes come after every file is written.
 - **No session ends with unpushed work** - and a push is reported only after its verification.
 - **Never push past a secrets/PII finding** - stop and ask.
+- **No session ends with a forgotten agent or process** it started. What stays on purpose is
+  named in the summary; "clean" is reported only after `leftover_procs.py` exits 0.
 - **The tidy deletes only known junk.** Everything else is moved; anything unclear goes to
   `_לבדיקה/`.
