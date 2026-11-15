@@ -196,7 +196,8 @@ python3 ~/.claude/skills/end-session/scripts/leftover_procs.py
 It finds this session's Claude process (via `~/.claude/sessions/<pid>.json`, or the nearest
 `claude` ancestor). Then it lists that process's live descendants, plus orphans of known types
 (node, python, ffmpeg, shells, headless Chromium) started after the session began.
-- `mcp_servers` end with the session. They're info only.
+- `mcp_servers` end with the session. `hooks` are workers of hooks configured in your
+  `settings.json`, and they finish on their own. Both are info only and are never killed.
 - Each item in `leftovers` has `pid`, `minutes`, `cmd` and `inner`, which is what runs under the
   wrapper shell.
 

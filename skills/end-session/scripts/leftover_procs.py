@@ -31,6 +31,7 @@ ORPHAN_NAMES = SHELL_NAMES | {"node", "python", "python3", "pythonw", "ffmpeg", 
 INIT_NAMES = {"init", "systemd", "launchd"}
 HEADLESS_MARKS = ("--headless", "ms-playwright", "puppeteer")
 MCP_MARK = "mcp"
+HOOK_SCRIPT = re.compile(r"[\w.-]+\.(?:py|js|mjs|cjs|ts|sh|ps1)\b", re.I)
 CLAUDE_CMD = re.compile(r"(^|[/\\\s])claude(\.exe|\.js)?(\s|$)|@anthropic-ai[/\\]claude-code", re.I)
 PS_QUERY = ("[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process | "
             "Select-Object ProcessId,ParentProcessId,Name,CommandLine,"
@@ -150,15 +151,43 @@ def _is_orphan(proc: dict, procs: dict, started_ms: int) -> bool:
     return True
 
 
-def _protected(procs: dict, self_chain: list, other_sessions: set) -> set:
-    protected = set(self_chain) | other_sessions | descendants(procs, self_chain[0])
+def _command_strings(node) -> list:
+    if isinstance(node, dict):
+        found = [node["command"]] if isinstance(node.get("command"), str) else []
+        return found + [c for v in node.values() for c in _command_strings(v)]
+    return [c for v in node for c in _command_strings(v)] if isinstance(node, list) else []
+
+
+def hook_markers(settings_files: list) -> set:
+    """Script names run by configured hooks - their (often detached) workers are not leftovers."""
+    markers = set()
+    for path in settings_files:
+        try:
+            hooks = json.loads(Path(path).read_text(encoding="utf-8")).get("hooks", {})
+        except (OSError, ValueError, AttributeError):
+            continue
+        for command in _command_strings(hooks):
+            markers |= {m.lower() for m in HOOK_SCRIPT.findall(command)}
+    return markers
+
+
+def _settings_files(cwd: str) -> list:
+    homes = [Path.home() / ".claude"] + ([Path(cwd) / ".claude"] if cwd else [])
+    return [h / name for h in homes for name in ("settings.json", "settings.local.json")]
+
+
+def _protected(procs: dict, session_pid: int, self_chain: list, other_sessions: set) -> set:
+    # The whole command that runs this script (pipes included) hangs off the session's direct child.
+    idx = self_chain.index(session_pid) if session_pid in self_chain else 0
+    command_root = self_chain[idx - 1] if idx > 0 else self_chain[0]
+    protected = set(self_chain) | other_sessions | descendants(procs, command_root)
     for other in other_sessions:
         protected |= descendants(procs, other)
     return protected
 
 
 def find_leftovers(procs: dict, session_pid: int, started_ms: int, self_chain: list,
-                   other_sessions: set, now_ms: int) -> dict:
+                   other_sessions: set, now_ms: int, hooks: set = frozenset()) -> dict:
     mcp_tree = set()
     for pid in descendants(procs, session_pid):
         if parent_of(procs, pid) == session_pid and MCP_MARK in procs[pid]["cmd"].lower():
@@ -167,9 +196,12 @@ def find_leftovers(procs: dict, session_pid: int, started_ms: int, self_chain: l
     for pid, proc in procs.items():
         if _is_orphan(proc, procs, started_ms):
             pool |= {pid} | descendants(procs, pid)
-    pool -= _protected(procs, self_chain, other_sessions)
+    pool -= _protected(procs, session_pid, self_chain, other_sessions)
     pool = {p for p in pool if base(procs[p]) not in IGNORED_NAMES}
-    return _report(procs, pool, session_pid, mcp_tree, now_ms)
+    hook_tree = {p for p in pool if any(m in procs[p]["cmd"].lower() for m in hooks)}
+    for pid in list(hook_tree):
+        hook_tree |= descendants(procs, pid) & pool
+    return _report(procs, pool, session_pid, mcp_tree | hook_tree, hook_tree, now_ms)
 
 
 def _inner_cmd(procs: dict, root: int, pool: set) -> str:
@@ -180,21 +212,27 @@ def _inner_cmd(procs: dict, root: int, pool: set) -> str:
     return ""
 
 
-def _item(procs: dict, pid: int, pool: set, session_pid: int, mcp_tree: set, now_ms: int) -> dict:
-    kind = "mcp" if pid in mcp_tree else "child" if session_pid in ancestors(procs, pid) else "orphan"
+def _item(procs: dict, pid: int, pool: set, session_pid: int, info: tuple, now_ms: int) -> dict:
+    mcp_tree, hook_tree = info
+    if pid in hook_tree or pid in mcp_tree:
+        kind = "hook" if pid in hook_tree else "mcp"
+    else:
+        kind = "child" if session_pid in ancestors(procs, pid) else "orphan"
     return {"pid": pid, "name": procs[pid]["name"], "kind": kind,
             "minutes": round((now_ms - procs[pid]["created"]) / 60000, 1),
             "children": len(descendants(procs, pid) & pool),
             "cmd": procs[pid]["cmd"][:CMD_PREVIEW], "inner": _inner_cmd(procs, pid, pool)}
 
 
-def _report(procs: dict, pool: set, session_pid: int, mcp_tree: set, now_ms: int) -> dict:
+def _report(procs: dict, pool: set, session_pid: int, info_tree: set, hook_tree: set, now_ms: int) -> dict:
+    """info_tree = MCP servers + hook workers: listed for information, never killed."""
     roots = [p for p in sorted(pool) if parent_of(procs, p) not in pool]
-    items = [_item(procs, p, pool, session_pid, mcp_tree, now_ms) for p in roots]
-    leftovers = [i for i in items if i["kind"] != "mcp"]
+    items = [_item(procs, p, pool, session_pid, (info_tree, hook_tree), now_ms) for p in roots]
+    leftovers = [i for i in items if i["kind"] in ("child", "orphan")]
     return {"status": "leftovers" if leftovers else "clean", "session_pid": session_pid,
             "leftovers": leftovers, "mcp_servers": [i for i in items if i["kind"] == "mcp"],
-            "killable": sorted(p for p in pool if p not in mcp_tree)}
+            "hooks": [i for i in items if i["kind"] == "hook"],
+            "killable": sorted(p for p in pool if p not in info_tree)}
 
 
 def _kill_tree(pid: int) -> dict:
@@ -225,7 +263,8 @@ def scan(session_pid_arg) -> dict:
         return {"status": "error", "reason": "could not find this Claude session's process; pass --session-pid"}
     others = {p for p in sessions if p in procs and p != session_pid}
     started = int(sessions.get(session_pid, {}).get("startedAt") or procs[session_pid]["created"])
-    return find_leftovers(procs, session_pid, started, ancestors(procs, os.getpid()), others, now_ms)
+    hooks = hook_markers(_settings_files(sessions.get(session_pid, {}).get("cwd", "")))
+    return find_leftovers(procs, session_pid, started, ancestors(procs, os.getpid()), others, now_ms, hooks)
 
 
 def main(argv: list) -> int:
